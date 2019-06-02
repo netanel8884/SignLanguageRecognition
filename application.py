@@ -1,61 +1,64 @@
+"""
+Inspired by https://github.com/jgv7/CNN-HowManyFingers/blob/master/application.py
+"""
+
 from keras.models import load_model
 import numpy as np
 import copy
 from utils import *
-from projectParams import classes
+from projectParams import classes, font
 import asyncio
+from PIL import ImageDraw, Image
+from cnn12 import modelPath, modelWeights, imgDim
 
-from cnn12 import modelPath
-from cnn12 import modelWeights
-from cnn12 import imgDim
-
+# Globals
 model = load_model(modelPath)
 model.load_weights(modelWeights)
 dataColor = (0, 255, 0)
-font = cv2.FONT_HERSHEY_SIMPLEX
-fx, fy, fh = 10, 50, 45
 className = ''
+pred = ''
 sentence = ""
-count = 0
-showMask = 0
 freq = 50
+count = freq
 
 
 async def predictImg(roi):
-    global count, className, sentence
+    global count, className, sentence, pred
 
-    count = count + 1
-    if count % freq == 0:
-        img = cv2.resize(roi, (imgDim, imgDim))
-        img = np.float32(img) / 255.
-        img = np.expand_dims(img, axis=-1)
-        img = np.expand_dims(img, axis=0)
-        vec = model.predict(img)
-        maxVal = np.amax(vec)
+    img = cv2.resize(roi, (imgDim, imgDim))
+    img = np.float32(img) / 255.
+    img = np.expand_dims(img, axis=-1)
+    img = np.expand_dims(img, axis=0)
+    vec = model.predict(img)
+    pred = convertEnglishToHebrewLetter(classes[np.argmax(vec[0])])
+    maxVal = np.amax(vec)
+    count = count - 1
+    if maxVal < 0.7:  # 70%
+        pred = ''
+
+    if count == 0:
+        count = freq
+        if pred == 'del':
+            sentence = sentence[:-1]
+        else:
+            sentence = sentence + pred
+        if pred == ' ':
+            pred = 'space'
 
         if maxVal > 0.7:  # 70%
-            pred = classes[np.argmax(vec[0])]
-            pred = convertEnglishToHebrewLetter(pred)
-            if pred == 'del':
-                sentence = sentence[:-1]
-            else:
-                sentence = sentence + pred
-            if pred == ' ':
-                pred = 'space'
-            print('prediction: ' + pred)
             print(finalizeHebrewString(sentence))
         else:
             className = ''
 
 
 def main():
-    global font, fx, fy, fh
-    global dataColor, predict
-    global className, count
-    global showMask, window
+    global dataColor, window
+    global className, count, pred
 
-    x0, y0, width = 400, 50, 224
+    showMask = 0
     predict = 0
+    fx, fy, fh = 10, 50, 45
+    x0, y0, width = 400, 50, 224
     cam = cv2.VideoCapture(0)
     cv2.namedWindow('Original', cv2.WINDOW_NORMAL)
 
@@ -65,13 +68,6 @@ def main():
         frame = cv2.flip(frame, 1)  # mirror
         window = copy.deepcopy(frame)
         cv2.rectangle(window, (x0, y0), (x0 + width - 1, y0 + width - 1), dataColor, 12)
-
-        if predict:
-            dataColor = (0, 250, 0)
-            cv2.putText(window, 'Prediction: ON', (fx, fy), font, 1.2, dataColor, 2, 1)
-        else:
-            dataColor = (0, 0, 250)
-            cv2.putText(window, 'Prediction: OFF', (fx, fy), font, 1.2, dataColor, 2, 1)
 
         # get region of interest
         roi = frame[y0:y0 + width, x0:x0 + width]
@@ -87,9 +83,21 @@ def main():
             loop = asyncio.get_event_loop()
             loop.run_until_complete(predictImg(roi))
 
-            # use below for demoing purposes
-            # cv2.putText(window, 'Prediction: %s' % (pred), (x0,y0-25), font, 1.0, (255,0,0), 2, 1)
-        # cv2.putText(window, 'Prediction: %s' % className, (fx, fy + 2 * fh), font, 1.0, (245, 210, 65), 2, 1)
+        if predict:
+            dataColor = (0, 250, 0)
+            cv2.putText(window, 'Prediction: ON', (fx, fy), cv2.FONT_HERSHEY_SIMPLEX, 1.2, dataColor, 2, 1)
+        else:
+            dataColor = (0, 0, 250)
+            cv2.putText(window, 'Prediction: OFF', (fx, fy), cv2.FONT_HERSHEY_SIMPLEX, 1.2, dataColor, 2, 1)
+
+        # Add Letter prediction
+        img_pil = Image.fromarray(window)
+        draw = ImageDraw.Draw(img_pil)
+        draw.text((fx,  fy + fh), "Prediction: %s" % pred, font=font, fill=dataColor)
+        draw.text((fx, fy + 2 * fh), 'Sample Timer: %d ' % count, font=font, fill=dataColor)
+        window = np.array(img_pil)
+
+        # Display
         cv2.imshow('Original', window)
 
         # Keyboard inputs

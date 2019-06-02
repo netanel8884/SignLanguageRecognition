@@ -74,7 +74,7 @@ def convertEnglishToHebrewLetter(englishLetter):
     elif 'A' <= englishLetter <= 'V':
         return convertIndexToHebrewLetter(ord(englishLetter) - ord('A'))
     else:
-        return -1
+        return ''
 
 
 def convertHebrewLetterToFinal(hebrewLetter):
