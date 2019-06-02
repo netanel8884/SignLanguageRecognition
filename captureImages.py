@@ -1,16 +1,21 @@
+"""
+Inspired by https://github.com/jgv7/CNN-HowManyFingers/blob/master/application.py
+Script captures photos to directories. [A->Z].
+Mapping Hebrew AlphaBet to English AlphaBet by letter order.
+"""
+
 import os
 import copy
 import cv2
 from utils import binaryMask
 from projectParams import classes
 
+# Globals
 dataColor = (0, 255, 0)
 font = cv2.FONT_HERSHEY_SIMPLEX
-fx, fy, fh = 10, 50, 45
-takingData = 0
 className = classes[0]
 count = 0
-showMask = 0
+
 dataFolder = 'captureData'     # The data folder to save the captured images to.
 
 
@@ -26,11 +31,14 @@ def initClass(name):
 
 
 def captureImages():
-    global font, fx, fy, fh
+    global font
     global takingData, dataColor
     global className, count
     global showMask
 
+    showMask = 0
+    takingData = 0
+    fx, fy, fh = 10, 50, 45
     x0, y0, width = 200, 220, 224
 
     cam = cv2.VideoCapture(0)
